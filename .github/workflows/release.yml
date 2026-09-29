@@ -99,13 +99,15 @@ jobs:
             printf '\n## 变更文件\n\n'
             if [ -n "$PREV" ]; then
               printf '对比区间 `%s..%s`：\n\n```\n' "$PREV" "$TAG"
-              git diff --name-status "${PREV}..${TAG}"
+              git -c core.quotepath=false diff --name-status "${PREV}..${TAG}"
               printf '```\n'
             else
               printf '首个 Release，包含仓库当前全部文件：\n\n```\n'
-              git ls-tree -r --name-only "$TAG"
+              git -c core.quotepath=false ls-tree -r --name-only "$TAG"
               printf '```\n'
             fi
+            # core.quotepath=false：否则中文文件名会被转义成八进制（如
+            # "\350\277\220\..."），清单变得不可读。
           } > notes.md
 
           echo "== 发布说明 =="

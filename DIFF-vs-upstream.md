@@ -31,7 +31,7 @@
 | `_ref/Test-PwrApi.ps1` | 修改 | 6435 B | 7105 B | +8 / -3 | 见下文详解 |
 | `modules/PowerTune.psm1` | 修改 | 31032 B | 33141 B | +41 / -13 | 见下文详解 |
 | `vendor/NOTICE.md` | 修改 | 1991 B | 2583 B | +38 / -27 | 见下文详解 |
-| `.github/workflows/release.yml` | **新增** | — | 4570 B | 全新文件 | 见下文详解 |
+| `.github/workflows/release.yml` | **新增** | — | 4770 B | 全新文件 | 见下文详解 |
 | `DIFF-vs-upstream.md` | **新增** | — | 24114 B | 全新文件 | 见下文详解 |
 | `Show-PowerMenu.ps1` | **新增** | — | 44246 B | 全新文件 | 见下文详解 |
 | `运行控制面板.bat` | **新增** | — | 2815 B | 全新文件 | 见下文详解 |
@@ -216,7 +216,7 @@ _ref/writable-test.csv
 
 ### `.github/workflows/release.yml`
 
-**规模**：新增文件，4570 字节。
+**规模**：新增文件，4770 字节。
 
 **全新文件 —— 自动发布工作流。**
 
