@@ -45,4 +45,5 @@ MSIL / x86（32 位），构建年份 2017，未做 Authenticode 数字签名。
 - 仓库根目录的 MIT 许可**覆盖本项目自身的代码**，不覆盖任何第三方组件；
   这里也不存在可分发给第三方的组件内容。
 - 若您是该工具的版权所有者，并认为本说明的表述或历史提交中的副本需要移除，
-  请提 issue，我们会立即处理。
+  请在本仓库提 issue 或提交 Pull Request，我们会立即处理：
+  <https://github.com/MXDexRazero/pse-powertuner/issues>
