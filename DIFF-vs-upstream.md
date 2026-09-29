@@ -12,7 +12,7 @@
 | 本 fork | `MXDexRazero/pse-powertuner` （<https://github.com/MXDexRazero/pse-powertuner>） |
 | 差异方向 | **本 fork 领先于上游**，上游尚未合并本仓库的改动 |
 
-统计：本地文件 **18** 个，上游文件 **16** 个；完全一致 **3** 项，有差异 **12** 项，本 fork 新增 **3** 项，仅存在于上游 **1** 项。
+统计：本地文件 **17** 个，上游文件 **16** 个；完全一致 **3** 项，有差异 **11** 项，本 fork 新增 **3** 项，本 fork 删除 **1** 项，仅存在于上游 **1** 项。
 
 ## 二、文件清单与状态总览
 
@@ -26,16 +26,16 @@
 | `Apply-PowerProfile.ps1` | 修改 | 9793 B | 9976 B | +5 / -4 | 见下文详解 |
 | `Install-PowerTuneTask.ps1` | 修改 | 4651 B | 4654 B | +0 / -0 | 见下文详解 |
 | `Invoke-PowerBench.ps1` | 修改 | 8248 B | 10215 B | +84 / -40 | 见下文详解 |
-| `README.md` | 修改 | 7983 B | 13227 B | +98 / -14 | 见下文详解 |
+| `README.md` | 修改 | 7983 B | 13125 B | +98 / -15 | 见下文详解 |
 | `Rollback-PowerScheme.ps1` | 修改 | 2828 B | 2990 B | +6 / -2 | 见下文详解 |
 | `Show-PowerReport.ps1` | 修改 | 8239 B | 8484 B | +12 / -7 | 见下文详解 |
-| `_ref/Push-ViaApi.ps1` | 修改 | 3635 B | 3638 B | +0 / -0 | 见下文详解 |
 | `_ref/Test-PwrApi.ps1` | 修改 | 6435 B | 7105 B | +8 / -3 | 见下文详解 |
 | `modules/PowerTune.psm1` | 修改 | 31032 B | 33021 B | +38 / -11 | 见下文详解 |
 | `vendor/NOTICE.md` | 修改 | 1991 B | 1994 B | +1 / -1 | 见下文详解 |
-| `DIFF-vs-upstream.md` | **新增** | — | 16823 B | 全新文件 | 见下文详解 |
+| `DIFF-vs-upstream.md` | **新增** | — | 17186 B | 全新文件 | 见下文详解 |
 | `Show-PowerMenu.ps1` | **新增** | — | 44246 B | 全新文件 | 见下文详解 |
 | `运行控制面板.bat` | **新增** | — | 2815 B | 全新文件 | 见下文详解 |
+| `_ref/Push-ViaApi.ps1` | **删除** | 3635 B | — | 已移除 | 见下文详解 |
 | `_ref/writable-test.csv` | 仅上游有 | 2815 B | — | — | 已按 `.gitignore` 排除，见「四、被排除的文件」 |
 
 ### 编码变更（内容无差异）
@@ -43,7 +43,6 @@
 以下文件**内容完全一致**，差异仅为补齐 UTF-8 BOM：
 
 - `Install-PowerTuneTask.ps1`
-- `_ref/Push-ViaApi.ps1`
 
 **原因**：Windows PowerShell 5.1 按系统 ANSI 代码页（GBK）解码无 BOM 的 UTF-8 脚本，会导致中文注释乱码并触发 `ParserError`。本项目约定所有 `.ps1` / `.psm1` 一律保存为 **UTF-8 with BOM**，此改动是必要修复而非噪声。
 
@@ -113,7 +112,7 @@ _ref/writable-test.csv
 
 ### `README.md`
 
-**规模**：上游 7983 字节 → 本地 13227 字节，行变化 +98 / -14。
+**规模**：上游 7983 字节 → 本地 13125 字节，行变化 +98 / -15。
 
 随核心模块同步更新对外表述，主要有：
 
@@ -204,7 +203,7 @@ _ref/writable-test.csv
 
 ### `DIFF-vs-upstream.md`
 
-**规模**：新增文件，16823 字节。
+**规模**：新增文件，17186 字节。
 
 **全新文件（本文档）。**
 
@@ -276,10 +275,34 @@ if /i "%~1"=="-nomouse" set "ELEV_ARG=-ArgumentList '-nomouse'"
 
 同时把注释里的旧文件名 `Run-PowerTune.bat` 改为不指名（该文件已改名，且批处理注释必须纯 ASCII）。
 
+### `_ref/Push-ViaApi.ps1`
+
+**规模**：已从本 fork 中删除（上游为 3635 字节）。
+
+**已从本 fork 中删除**（上游仍保留）。
+
+它在上游的定位是「备用上传通路」：当 `github.com:443` 被网络屏蔽时绕过 git，
+直接走 GitHub REST 对象 API 把本地仓库内容推上去（二进制走 base64 编码，
+自动以远程当前 HEAD 为父节点追加新提交）。
+
+删除理由有三：
+
+1. **本机不需要这条通路**。`git push` 经系统级 Git Credential Manager 可直接完成认证，
+   加上显式代理（`127.0.0.1:7890`）即可正常访问 GitHub，不存在需要绕行的场景。
+2. **无法直接复用**。脚本内硬编码了上游作者的个人环境 —— 本地仓库路径
+   `C:\Users\hongx\Documents\jiebao\PSE-PowerTuner`、`Owner = 'Zioove'`、
+   gh CLI 路径 `C:\Program Files\GitHub CLI\gh.exe`。换人换机器都必须先改这几处，
+   留着反而容易误用。
+3. **减少凭据相关面**。该脚本会以调用者身份向 GitHub 写入内容，属凭据相关工具；
+   在已有正规 git 通路的前提下没有保留价值。
+
+若日后确实遇到 `github.com:443` 不可达，可从上游客仓库或本 fork 的历史提交中取回。
+
 ## 四、被排除的文件
 
 | 文件 | 归属 | 未纳入本 fork 的原因 |
 |---|---|---|
+| `_ref/Push-ViaApi.ps1` | 上游有、本 fork 已删 | **有意删除**，不是遗漏。理由见「三、逐文件差异详解」。 |
 | `_ref/writable-test.csv` | 仅上游有 | `_ref\Test-PwrApi.ps1` 的本机专属产物：① 记录的是本机可写集合；②「原值」列依赖运行探测时的激活方案，**换机器或换档位即失真**。已加入 `.gitignore` 不再入库。需在任意机器上复核可写性时，重跑 `_ref\Test-PwrApi.ps1` （管理员）即可 |
 | `pse-powertuner-main.zip` | 仅本地有 | GitHub 下载的上游源码归档快照，属临时产物，非仓库内容，已按约定排除 |
 | `.workbuddy/` | 仅本地有 | 工作区辅助目录，非项目代码 |
