@@ -170,6 +170,19 @@ cd <本仓库目录>
 | `_ref\Test-PwrApi.ps1` | 可写性探测工具，换机器时重跑它刷新白名单（产物 csv 不入库） |
 | `_ref\processor-settings.csv` | 处理器电源管理子组下全部 95 项设置清单 |
 | `vendor\NOTICE.md` | 第三方组件的溯源与来源说明（**不含任何第三方二进制**，见下） |
+| `.github\workflows\release.yml` | 自动发布：推送 `v*` 标签时自动生成 Release 与发布说明（见「发布」） |
+
+## 发布
+
+打标签并推送即会自动创建 Release，说明由 GitHub 依据「上一个 tag 以来的提交」自动生成：
+
+```powershell
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+也可在仓库的 Actions 页面手动触发（需填写一个已存在的 tag）。首次没有历史 tag 时，
+发布说明会覆盖全部提交。） |
 
 ## 换到别的机器
 

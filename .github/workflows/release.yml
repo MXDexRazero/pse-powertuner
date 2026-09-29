@@ -1,0 +1,49 @@
+# 自动发布：推送 v* 标签时，自动生成 Release 与发布说明。
+#
+# 发布说明由 GitHub 依据「上一个 tag 以来的提交」自动生成（--generate-notes），
+# 不需要手写 changelog。手动触发请在 Actions 页面选 Run workflow 并填写已存在的 tag。
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (must already exist), e.g. v1.0.0'
+        required: true
+        type: string
+
+# 创建 Release 需要写权限；GITHUB_TOKEN 默认只读，此处显式放开
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag name
+        id: tag
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create release with generated notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          set -euo pipefail
+          echo "Creating release for tag: $TAG"
+          # --verify-tag: tag 不存在就直接失败，避免误建一个空 Release
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$TAG" \
+            --generate-notes \
+            --verify-tag

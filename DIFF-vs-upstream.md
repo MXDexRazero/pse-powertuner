@@ -12,7 +12,7 @@
 | 本 fork | `MXDexRazero/pse-powertuner` （<https://github.com/MXDexRazero/pse-powertuner>） |
 | 差异方向 | **本 fork 领先于上游**，上游尚未合并本仓库的改动 |
 
-统计：本地文件 **16** 个，上游文件 **16** 个；完全一致 **2** 项，有差异 **11** 项，本 fork 新增 **3** 项，本 fork 删除 **2** 项，仅存在于上游 **1** 项。
+统计：本地文件 **17** 个，上游文件 **16** 个；完全一致 **2** 项，有差异 **11** 项，本 fork 新增 **4** 项，本 fork 删除 **2** 项，仅存在于上游 **1** 项。
 
 ## 二、文件清单与状态总览
 
@@ -25,12 +25,13 @@
 | `Apply-PowerProfile.ps1` | 修改 | 9793 B | 9976 B | +5 / -4 | 见下文详解 |
 | `Install-PowerTuneTask.ps1` | 修改 | 4651 B | 4654 B | +0 / -0 | 见下文详解 |
 | `Invoke-PowerBench.ps1` | 修改 | 8248 B | 10215 B | +84 / -40 | 见下文详解 |
-| `README.md` | 修改 | 7983 B | 13038 B | +112 / -30 | 见下文详解 |
+| `README.md` | 修改 | 7983 B | 13518 B | +125 / -30 | 见下文详解 |
 | `Rollback-PowerScheme.ps1` | 修改 | 2828 B | 2990 B | +6 / -2 | 见下文详解 |
 | `Show-PowerReport.ps1` | 修改 | 8239 B | 8484 B | +12 / -7 | 见下文详解 |
 | `_ref/Test-PwrApi.ps1` | 修改 | 6435 B | 7105 B | +8 / -3 | 见下文详解 |
 | `modules/PowerTune.psm1` | 修改 | 31032 B | 33141 B | +41 / -13 | 见下文详解 |
 | `vendor/NOTICE.md` | 修改 | 1991 B | 2583 B | +38 / -27 | 见下文详解 |
+| `.github/workflows/release.yml` | **新增** | — | 1519 B | 全新文件 | 见下文详解 |
 | `DIFF-vs-upstream.md` | **新增** | — | 22451 B | 全新文件 | 见下文详解 |
 | `Show-PowerMenu.ps1` | **新增** | — | 44246 B | 全新文件 | 见下文详解 |
 | `运行控制面板.bat` | **新增** | — | 2815 B | 全新文件 | 见下文详解 |
@@ -112,7 +113,7 @@ _ref/writable-test.csv
 
 ### `README.md`
 
-**规模**：上游 7983 字节 → 本地 13038 字节，行变化 +112 / -30。
+**规模**：上游 7983 字节 → 本地 13518 字节，行变化 +125 / -30。
 
 随核心模块同步更新对外表述，主要有：
 
@@ -212,6 +213,21 @@ _ref/writable-test.csv
 - 保留并完整记录三份哈希（zip / exe / exe.config），供已自行获取者核验版本
 - 新增「为什么不随仓库分发」一节，写明许可状态无法确认的具体依据
 - 新增「自行获取与校验」与「合规与联系」两节，并保留权利人的移除通道
+
+### `.github/workflows/release.yml`
+
+**规模**：新增文件，1519 字节。
+
+**全新文件 —— 自动发布工作流。**
+
+上游没有任何 CI 配置。新增它以支持「打 tag 即自动出 Release」：
+
+- 触发条件：推送 `v*` 标签；或在 Actions 页面手动触发（需填已存在的 tag）
+- 说明由 GitHub 依据「上一个 tag 以来的提交」**自动生成**（`gh release create --generate-notes`），
+  无需手写 changelog
+- 使用 runner 上预装的 `gh` CLI，不引入第三方 Action，避免额外供应链依赖
+- `permissions: contents: write` 必须显式声明 —— `GITHUB_TOKEN` 默认只读，不放开则创建 Release 会 403
+- 加 `--verify-tag`：tag 不存在时直接失败，避免在打错标签时建出一个空 Release
 
 ### `DIFF-vs-upstream.md`
 
