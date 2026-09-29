@@ -1,7 +1,8 @@
-# 自动发布：推送 v* 标签时，自动生成 Release 与发布说明。
+# 自动发布：推送 v* 标签时
+#   1) 把仓库全部文件打包成 ZIP 并作为资产上传
+#   2) 生成发布说明 = GitHub 自动摘要 + 本次变更文件清单
 #
-# 发布说明由 GitHub 依据「上一个 tag 以来的提交」自动生成（--generate-notes），
-# 不需要手写 changelog。手动触发请在 Actions 页面选 Run workflow 并填写已存在的 tag。
+# 手动触发：Actions 页面 Run workflow，填写一个已存在的 tag。
 name: Release
 
 on:
@@ -21,7 +22,7 @@ permissions:
 
 jobs:
   release:
-    name: Create release
+    name: Build zip and publish release
     runs-on: ubuntu-latest
     steps:
       - name: Resolve tag name
@@ -34,16 +35,92 @@ jobs:
             echo "name=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create release with generated notes
+      # 必须 checkout：.gitattributes 里 .bat 是 eol=crlf，只有工作区取出的才是 CRLF。
+      # 用 git archive 会直接读 blob（LF），导致 .bat 解压后换行不对。
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Package all files into zip
+        id: package
+        env:
+          TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          set -euo pipefail
+          ZIP="pse-powertuner-${TAG}.zip"
+          # 打包仓库全部文件，排除版本库目录
+          zip -r -q "$ZIP" . -x '.git/*'
+          echo "asset=$ZIP" >> "$GITHUB_OUTPUT"
+          echo "== 包内文件 =="
+          python3 -c "import zipfile,sys; print('\n'.join(zipfile.ZipFile(sys.argv[1]).namelist()))" "$ZIP"
+
+      - name: Check bat line endings inside zip
+        run: |
+          set -uo pipefail
+          ZIP="pse-powertuner-${{ steps.tag.outputs.name }}.zip"
+          # .bat 必须是 CRLF：cmd 按 OEM 代码页解码，若同时是 LF 会把多字节内容
+          # 整段误判成命令，表现为满屏「'***' 不是内部或外部命令」。
+          BAT=$(python3 -c "import sys,zipfile; print(next((n for n in zipfile.ZipFile(sys.argv[1]).namelist() if n.lower().endswith('.bat')), ''))" "$ZIP" || true)
+          if [ -z "$BAT" ]; then
+            echo "::warning::包内未找到 .bat，跳过换行校验"
+            exit 0
+          fi
+          if unzip -p "$ZIP" "$BAT" | head -n 5 | grep -q $'\r'; then
+            echo "OK: $BAT 保持 CRLF"
+          else
+            echo "::warning::$BAT 不是 CRLF，请检查 .gitattributes 的 eol 规则"
+          fi
+
+      - name: Compose release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          set -uo pipefail
+          # 上一个 tag；首个 Release 时为空
+          PREV=$(git describe --tags --abbrev=0 "${TAG}^" 2>/dev/null || true)
+
+          # ① GitHub 自动摘要（取不到就退回 git log）
+          NOTES=$(gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+            -f tag_name="$TAG" --jq .body 2>/dev/null || true)
+          if [ -z "$NOTES" ]; then
+            if [ -n "$PREV" ]; then
+              NOTES=$(git log --pretty=format:'- %s (%h)' "${PREV}..${TAG}")
+            else
+              NOTES=$(git log --pretty=format:'- %s (%h)' "$TAG")
+            fi
+          fi
+
+          # ② 变更文件清单
+          {
+            printf '%s\n' "$NOTES"
+            printf '\n## 变更文件\n\n'
+            if [ -n "$PREV" ]; then
+              printf '对比区间 `%s..%s`：\n\n```\n' "$PREV" "$TAG"
+              git diff --name-status "${PREV}..${TAG}"
+              printf '```\n'
+            else
+              printf '首个 Release，包含仓库当前全部文件：\n\n```\n'
+              git ls-tree -r --name-only "$TAG"
+              printf '```\n'
+            fi
+          } > notes.md
+
+          echo "== 发布说明 =="
+          cat notes.md
+
+      - name: Create release and upload zip
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.tag.outputs.name }}
         run: |
           set -euo pipefail
-          echo "Creating release for tag: $TAG"
-          # --verify-tag: tag 不存在就直接失败，避免误建一个空 Release
+          # --verify-tag：tag 不存在直接失败，避免误建空 Release
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --title "$TAG" \
-            --generate-notes \
-            --verify-tag
+            --notes-file notes.md \
+            --verify-tag \
+            "${{ steps.package.outputs.asset }}"

@@ -25,14 +25,14 @@
 | `Apply-PowerProfile.ps1` | 修改 | 9793 B | 9976 B | +5 / -4 | 见下文详解 |
 | `Install-PowerTuneTask.ps1` | 修改 | 4651 B | 4654 B | +0 / -0 | 见下文详解 |
 | `Invoke-PowerBench.ps1` | 修改 | 8248 B | 10215 B | +84 / -40 | 见下文详解 |
-| `README.md` | 修改 | 7983 B | 13518 B | +125 / -30 | 见下文详解 |
+| `README.md` | 修改 | 7983 B | 14119 B | +137 / -30 | 见下文详解 |
 | `Rollback-PowerScheme.ps1` | 修改 | 2828 B | 2990 B | +6 / -2 | 见下文详解 |
 | `Show-PowerReport.ps1` | 修改 | 8239 B | 8484 B | +12 / -7 | 见下文详解 |
 | `_ref/Test-PwrApi.ps1` | 修改 | 6435 B | 7105 B | +8 / -3 | 见下文详解 |
 | `modules/PowerTune.psm1` | 修改 | 31032 B | 33141 B | +41 / -13 | 见下文详解 |
 | `vendor/NOTICE.md` | 修改 | 1991 B | 2583 B | +38 / -27 | 见下文详解 |
-| `.github/workflows/release.yml` | **新增** | — | 1519 B | 全新文件 | 见下文详解 |
-| `DIFF-vs-upstream.md` | **新增** | — | 22451 B | 全新文件 | 见下文详解 |
+| `.github/workflows/release.yml` | **新增** | — | 4570 B | 全新文件 | 见下文详解 |
+| `DIFF-vs-upstream.md` | **新增** | — | 23337 B | 全新文件 | 见下文详解 |
 | `Show-PowerMenu.ps1` | **新增** | — | 44246 B | 全新文件 | 见下文详解 |
 | `运行控制面板.bat` | **新增** | — | 2815 B | 全新文件 | 见下文详解 |
 | `_ref/Push-ViaApi.ps1` | **删除** | 3635 B | — | 已移除 | 见下文详解 |
@@ -113,7 +113,7 @@ _ref/writable-test.csv
 
 ### `README.md`
 
-**规模**：上游 7983 字节 → 本地 13518 字节，行变化 +125 / -30。
+**规模**：上游 7983 字节 → 本地 14119 字节，行变化 +137 / -30。
 
 随核心模块同步更新对外表述，主要有：
 
@@ -216,22 +216,31 @@ _ref/writable-test.csv
 
 ### `.github/workflows/release.yml`
 
-**规模**：新增文件，1519 字节。
+**规模**：新增文件，4570 字节。
 
 **全新文件 —— 自动发布工作流。**
 
-上游没有任何 CI 配置。新增它以支持「打 tag 即自动出 Release」：
+上游没有任何 CI 配置。新增它以支持「打 tag 即自动出 Release」，产出两部分：
 
+1. **ZIP 资产**：`pse-powertuner-<tag>.zip`，把仓库全部文件打包（排除 `.git`），作为 Release 资产上传
+2. **发布说明**：GitHub 自动生成的提交摘要 + 本次的**变更文件清单**
+   （对比上一个 tag 的 `git diff --name-status`；首个 Release 时改为列出全部文件）
+
+实现上的几个关键取舍：
+
+- **打包必须用 checkout 后的工作区，不能用 `git archive`。** `.gitattributes` 里 `.bat` 是
+  `eol=crlf`，只有工作区取出的 `.bat` 才是 CRLF；`git archive` 直接读 blob 会还原成 LF，
+  而 cmd 按 OEM 代码页解码 + LF 换行会把多字节内容整段误判成命令（本项目踩过的坑）。
+  工作流因此对包内 `.bat` 做了 CRLF 校验（不匹配只告警，不中断发布）。
 - 触发条件：推送 `v*` 标签；或在 Actions 页面手动触发（需填已存在的 tag）
-- 说明由 GitHub 依据「上一个 tag 以来的提交」**自动生成**（`gh release create --generate-notes`），
-  无需手写 changelog
-- 使用 runner 上预装的 `gh` CLI，不引入第三方 Action，避免额外供应链依赖
+- 说明中的「GitHub 自动摘要」走 `releases/generate-notes` 接口，取不到时回退到 `git log`
+- 使用 runner 上预装的 `gh` CLI 与 `zip`，不引入第三方 Action，避免额外供应链依赖
 - `permissions: contents: write` 必须显式声明 —— `GITHUB_TOKEN` 默认只读，不放开则创建 Release 会 403
-- 加 `--verify-tag`：tag 不存在时直接失败，避免在打错标签时建出一个空 Release
+- 加 `--verify-tag`：tag 不存在时直接失败，避免打错标签时建出一个空 Release
 
 ### `DIFF-vs-upstream.md`
 
-**规模**：新增文件，22451 字节。
+**规模**：新增文件，23337 字节。
 
 **全新文件（本文档）。**
 

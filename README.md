@@ -174,15 +174,27 @@ cd <本仓库目录>
 
 ## 发布
 
-打标签并推送即会自动创建 Release，说明由 GitHub 依据「上一个 tag 以来的提交」自动生成：
+打标签并推送，Actions 会自动完成发布：
 
 ```powershell
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-也可在仓库的 Actions 页面手动触发（需填写一个已存在的 tag）。首次没有历史 tag 时，
-发布说明会覆盖全部提交。） |
+生成的 Release 包含两部分：
+
+1. **ZIP 资产** —— `pse-powertuner-<tag>.zip`，仓库全部文件打包（不含 `.git`），可直接下载
+2. **发布说明** ——
+   - GitHub 自动生成的提交摘要
+   - 以及本次的**变更文件清单**（对比上一个 tag 的 `git diff --name-status`；
+     首个 Release 则列出全部文件）
+
+也可在 Actions 页面手动触发（需填写一个已存在的 tag）。
+
+> 打包用的是 checkout 后的工作区，而不是 `git archive`：`.gitattributes` 里 `.bat` 为
+> `eol=crlf`，只有工作区取出的 `.bat` 才是 CRLF；`git archive` 直接读 blob 会还原成 LF，
+> 而 cmd 按 OEM 代码页解码 + LF 换行会把多字节内容整段误判成命令。工作流对该项有校验
+> （不匹配只告警，不中断发布）。） |
 
 ## 换到别的机器
 
