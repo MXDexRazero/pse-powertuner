@@ -2,8 +2,9 @@
 .SYNOPSIS
     PowerSettingsExplorer 性能自动调整 —— 原生 API 公共库
 .DESCRIPTION
-    复刻 PowerSettingsExplorer 的访问通路：直接调用 powrprof.dll 的
-    PowerRead/WriteAC/DCValueIndex，而不是 powercfg.exe。
+    沿用与 PowerSettingsExplorer 相同的访问通路：直接调用 powrprof.dll 的
+    PowerRead/WriteAC/DCValueIndex（Windows 公开的 Power Management API），
+    而不是 powercfg.exe。本项目不调用也不包含 PowerSettingsExplorer 本体。
 
     为什么必须这样做：
       本机（以及多数 OEM 精简电源策略机器）的 powercfg /query 只认「方案已承载」

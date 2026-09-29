@@ -1,8 +1,9 @@
 # PSE-PowerTuner
 
-基于 **PowerSettingsExplorer** 逆向出的隐藏电源设置 GUID 表，把处理器性能相关的 31 项
-设置自动调成三档场景。核心不是"调用 powercfg"，而是**直接调用 `powrprof.dll`**——
-这是 PowerSettingsExplorer 的做法，也是本机能生效的唯一路径。
+沿着 **PowerSettingsExplorer**（第三方电源设置浏览工具）给出的思路——**不走 `powercfg.exe`，
+直接调用 `powrprof.dll`**——把处理器性能相关的 31 项隐藏电源设置自动调成三档场景。
+核心不是"调用 powercfg"，而是直接调用 Windows 公开的 Power Management API，
+这也是本机能生效的唯一路径。
 
 本分支在此之上新增了**中文交互式控制面板**，双击 `运行控制面板.bat` 即用
 （完整操作说明见「控制面板使用方法」一节），不想记命令行时派得上用场。
@@ -168,7 +169,7 @@ cd <本仓库目录>
 | `Install-PowerTuneTask.ps1` | 计划任务：登录应用 / 插拔电源自适应 |
 | `_ref\Test-PwrApi.ps1` | 可写性探测工具，换机器时重跑它刷新白名单（产物 csv 不入库） |
 | `_ref\processor-settings.csv` | 处理器电源管理子组下全部 95 项设置清单 |
-| `vendor\PowerSettingsExplorer.zip` | 第三方工具归档，仅供溯源；说明见 `vendor\NOTICE.md` |
+| `vendor\NOTICE.md` | 第三方组件的溯源与来源说明（**不含任何第三方二进制**，见下） |
 
 ## 换到别的机器
 
@@ -214,8 +215,11 @@ cd <本仓库目录>
 
 ## 关于 PowerSettingsExplorer
 
-本项目的向导来源于 **PowerSettingsExplorer**（Sameer，2017，.NET 4.5.1 / x86 / 未签名）。
-它本身是 powercfg 的 GUI 封装，但关键是它**不走 powercfg.exe**，而是直接 P/Invoke `powrprof.dll`：
+同类工具 **PowerSettingsExplorer**（第三方 Windows 电源设置浏览工具）给了本项目一个关键启发：
+它**不走 `powercfg.exe`**，而是直接 P/Invoke `powrprof.dll`。本项目沿用了同一条访问通路。
+
+所用到的都是 **Windows 公开的 Power Management API**（见 `powrprof.h` / Windows SDK 文档），
+可通过系统头文件与注册表结构自行验证：
 
 ```
 PowerEnumerate            PowerGetActiveScheme     PowerSetActiveScheme
@@ -225,17 +229,12 @@ PowerReadValueMin/Max/Increment      PowerReadPossibleValue
 PowerReadDefaultACIndex   PowerReadDefaultDCIndex  PowerDeterminePlatformRole
 ```
 
-内部数据模型：
+本项目**不调用、不分发** PowerSettingsExplorer 的本体，也未包含其任何二进制、IL 或
+反编译产物；全部 PowerShell 代码为自行实现（GUID 与取值语义来自 Windows 注册表
+`HKLM\SYSTEM\CurrentControlSet\Control\Power\PowerSettings`）。
 
-- `PwrSetting{ SubgroupGuid, SettingGuid, acIndexes, dcIndexes, hidden, PossibleValues, Units, _valueMin, _valueMax, _valueIncrement }`
-- `POWER_DATA_ACCESSOR`（29 个成员，含 `ACCESS_AC_POWER_SETTING_INDEX`、`ACCESS_ATTRIBUTES`、`ACCESS_ACTIVE_OVERLAY_SCHEME` 等）
-- `SchemeTypes{ scheme, overlay, profile }`、`RegType`（含 `REG_QWORD`）
-- 支持 `ExportSettings` / `ImportSettings` / `SaveSettingsAsSctipt` / `WriteToBatchFile`
-  （`SaveSettingsAsSctipt` 为原始程序集内的既有拼写，此处照录未改）
-
-本项目只借鉴其 API 调用方式与 GUID 语义，代码为自行实现。原始归档放在
-`vendor\PowerSettingsExplorer.zip` 供溯源（含 SHA256 与来源说明，见 `vendor\NOTICE.md`）；
-该归档内未附许可文件，本仓库不因此授予任何再分发许可。
+> 该工具的许可状态无法确认（归档与二进制内均无许可声明），因此本仓库不再提供其副本。
+> 如需获取，请从其官方发布渠道下载，校验值与说明见 `vendor\NOTICE.md`。
 
 ## 许可
 
