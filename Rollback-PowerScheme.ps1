@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     回滚电源方案：从备份导入，或恢复 Windows 默认值
 .EXAMPLE
@@ -62,12 +62,16 @@ if ($BackupDir) {
 Write-Host "回滚来源: $target" -ForegroundColor Cyan
 $n = Import-PowerSnapshot -BackupDir $target
 
+# .pow 导入只覆盖方案级配置，逐项设置值再用原生 API 还原一次（对已存在的同名方案同样生效）
+if (Test-Path (Join-Path $target 'values.json')) {
+    Restore-SnapshotValues -BackupDir $target | Out-Null
+}
+
 $mf = Join-Path $target 'manifest.json'
 if (Test-Path $mf) {
     $prev = (Get-Content $mf -Raw | ConvertFrom-Json).ActiveScheme
     if ($prev -and (Get-SchemeList).ContainsKey($prev)) {
-        Invoke-PowerCfg -Quiet -Arguments @('/setactive', $prev) | Out-Null
-        Write-TuneLog "已重新激活原方案 $prev" 'OK'
+        Set-ActiveScheme -SchemeGuid $prev | Out-Null
     } else {
         Write-Host '原激活方案已不存在（可能被恢复出厂清除），保持当前方案。' -ForegroundColor DarkGray
     }

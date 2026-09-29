@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     PowerSettingsExplorer 性能自动调整 —— 原生 API 公共库
 .DESCRIPTION
@@ -13,7 +13,7 @@
         PowerReadACValueIndex(同 GUID)              → rc=0, value=2
       因此基于 powercfg 的脚本会静默跳过全部 Turbo / EPP / 核心停放设置。
 
-    本机实测：34 项候选中 29 项可读可写（见 _ref\writable-test.csv）。
+    本机实测：34 项候选中 31 项可读可写、3 项只读（重跑 _ref\Test-PwrApi.ps1 可复核）。
 .NOTES
     需要管理员权限。Windows 10 / 11。
 #>
@@ -147,6 +147,11 @@ $Script:Settings = [ordered]@{
                          Desc='异构调度策略 0自动/4优先P核'; V='验证' }
     PERFAUTONOMOUS  = @{ Guid='8baa4a8a-14c6-4451-8e8b-14bdbd197537'; Group='PROCESSOR'
                          Desc='性能自主模式'; V='验证' }
+    # 两条异构调度策略在 Windows 全部默认方案中取值恒定（5 / AC=2,DC=5），不分档改写
+    HETEROSCHED     = @{ Guid='93b8b6dc-0698-4d1c-9ee4-0644e900c85d'; Group='PROCESSOR'
+                         Desc='异构线程调度策略 默认5'; V='验证' }
+    HETEROSCHED2    = @{ Guid='bae08b81-2d5e-4688-ad6a-13243356654b'; Group='PROCESSOR'
+                         Desc='短任务线程调度策略 默认2(AC)/5(DC)'; V='验证' }
 
     # ══ 频率缩放 ══
     PROCTHROTTLEMIN = @{ Guid='893dee8e-2bef-41e0-89c6-b55d0929964c'; Group='PROCESSOR'
@@ -173,6 +178,14 @@ $Script:Settings = [ordered]@{
     # ══ 空闲与散热 ══
     IDLEDISABLE     = @{ Guid='5d76a2ca-e8c0-402f-a133-2158492d58ad'; Group='PROCESSOR'
                          Desc='空闲禁用 1=禁止深度空闲'; V='验证' }
+    # 空闲升/降档阈值：越大越晚进入深 C 态（Windows 高性能 60/40，节能 40/20）
+    IDLEPROMOTE     = @{ Guid='7b224883-b3cc-4d79-819f-8374152cbe7c'; Group='PROCESSOR'
+                         Desc='空闲深眠阈值 越大越晚深眠'; V='验证' }
+    IDLEDEMOTE      = @{ Guid='4b92d758-5a24-4851-a470-815d78aee119'; Group='PROCESSOR'
+                         Desc='空闲唤醒阈值 越大越晚浅出'; V='验证' }
+    # Windows 全部默认方案中恒为 0（不限制），不要偏离
+    IDLEMAX         = @{ Guid='9943e905-9a30-4ec1-9b99-44dd3b76f7a2'; Group='PROCESSOR'
+                         Desc='最深 C 态上限 0=不限制'; V='验证' }
     SYSCOOLING      = @{ Guid='94d3a615-a899-4ac5-ae2b-e4d8f634367f'; Group='PROCESSOR'
                          Desc='系统散热策略 0被动/1主动'; V='验证' }
     ALLOWTHROTTLE   = @{ Guid='3b04d4fd-1cc7-4f23-ab1c-d1337819c4bb'; Group='PROCESSOR'
@@ -182,26 +195,25 @@ $Script:Settings = [ordered]@{
     PERFRESOURCEPRIORITY = @{ Guid='603fe9ce-8d01-4b48-a968-1d706c28fd5c'; Group='PROCESSOR'
                          Desc='处理器资源优先级'; V='验证' }
 
-    # ══ 本机只读 / 不可用（保留记录，写入会被拒并记为 Fail）══
+    # ══ 本机只读（保留记录，写入会被拒并记为 Fail）══
     PERFINCTIME     = @{ Guid='984cf492-3bed-4488-a8f9-4286c97bf5aa'; Group='PROCESSOR'
                          Desc='升频时间（本机只读）'; V='只读' }
     PERFDECTIME     = @{ Guid='d8edeb9b-95cf-4f95-a73c-b061973693c8'; Group='PROCESSOR'
                          Desc='降频时间（本机只读）'; V='只读' }
     PERFTIME        = @{ Guid='4d2b0152-7d5c-498b-88e2-34345392a2c5'; Group='PROCESSOR'
                          Desc='性能检查间隔（本机只读）'; V='只读' }
-    HETEROSCHED     = @{ Guid='93b8b6dc-0698-4d1c-9ee4-0644e900c85d'; Group='PROCESSOR'
-                         Desc='异构线程调度策略（本机不可读）'; V='不可用' }
 }
 
-# 本机可写白名单（来自 _ref\writable-test.csv 实测）
+# 本机可写白名单（历次 _ref\Test-PwrApi.ps1 实测结论，31 项）
 $Script:Writable = @(
     'PERFBOOSTMODE','PERFBOOSTPOL','PERFEPP','PERFEPP1',
     'CPMINCORES','CPMAXCORES','CPCONCURRENCY','CPHEADROOM','CPLATENCYHINTUNPARK',
-    'PERFHETERO','PERFAUTONOMOUS',
+    'PERFHETERO','PERFAUTONOMOUS','HETEROSCHED','HETEROSCHED2',
     'PROCTHROTTLEMIN','PROCTHROTTLEMAX','THROTTLEMIN_EC1','THROTTLEMAX_EC1',
     'PERFINCPOL','PERFDECPOL','PERFINCTHRESHOLD','PERFDECTHRESHOLD',
     'PERFLATENCYSENSITIVITY','MAXFREQ',
-    'IDLEDISABLE','SYSCOOLING','ALLOWTHROTTLE','DUTYCYCLING','PERFRESOURCEPRIORITY'
+    'IDLEDISABLE','IDLEPROMOTE','IDLEDEMOTE','IDLEMAX',
+    'SYSCOOLING','ALLOWTHROTTLE','DUTYCYCLING','PERFRESOURCEPRIORITY'
 )
 
 #endregion
@@ -210,7 +222,7 @@ $Script:Writable = @(
 
 $Script:Profiles = @{
     'balanced-stable' = @{
-        Title = '稳定本(日常/办公)'
+        Title = '稳定版(日常/办公)'
         Clone = 'PSE-Stable'
         AC = @{
             PERFBOOSTMODE='2'; PERFBOOSTPOL='2'; PERFEPP='50'; PERFEPP1='50'
@@ -222,6 +234,9 @@ $Script:Profiles = @{
             PERFLATENCYSENSITIVITY='50'
             SYSCOOLING='1'; ALLOWTHROTTLE='2'; IDLEDISABLE='0'
             MAXFREQ='0'; PERFRESOURCEPRIORITY='100'
+            # 空闲阈值取 Windows「平衡」默认值；异构调度两项目前不分档
+            IDLEPROMOTE='60'; IDLEDEMOTE='40'; IDLEMAX='0'
+            HETEROSCHED='5'; HETEROSCHED2='2'
         }
         DC = @{
             PERFBOOSTMODE='1'; PERFBOOSTPOL='1'; PERFEPP='70'; PERFEPP1='70'
@@ -231,6 +246,8 @@ $Script:Profiles = @{
             PERFINCPOL='0'; PERFDECPOL='0'
             PERFLATENCYSENSITIVITY='50'
             SYSCOOLING='1'; ALLOWTHROTTLE='2'; IDLEDISABLE='0'; MAXFREQ='0'
+            IDLEPROMOTE='40'; IDLEDEMOTE='20'; IDLEMAX='0'
+            HETEROSCHED='5'; HETEROSCHED2='5'
         }
     }
 
@@ -249,6 +266,9 @@ $Script:Profiles = @{
             PERFLATENCYSENSITIVITY='100'
             IDLEDISABLE='0'; SYSCOOLING='1'; ALLOWTHROTTLE='2'
             DUTYCYCLING='0'; MAXFREQ='0'; PERFRESOURCEPRIORITY='100'
+            # 空闲阈值取 Windows「高性能」默认值（AC/DC 同为 60/40，电池也不深眠）
+            IDLEPROMOTE='60'; IDLEDEMOTE='40'; IDLEMAX='0'
+            HETEROSCHED='5'; HETEROSCHED2='2'
         }
         DC = @{
             PERFBOOSTMODE='2'; PERFBOOSTPOL='2'; PERFEPP='10'; PERFEPP1='10'
@@ -260,6 +280,8 @@ $Script:Profiles = @{
             PERFINCPOL='2'; PERFDECPOL='0'
             PERFLATENCYSENSITIVITY='100'
             SYSCOOLING='1'; ALLOWTHROTTLE='2'; MAXFREQ='0'
+            IDLEPROMOTE='60'; IDLEDEMOTE='40'; IDLEMAX='0'
+            HETEROSCHED='5'; HETEROSCHED2='5'
         }
     }
 
@@ -276,6 +298,9 @@ $Script:Profiles = @{
             PERFLATENCYSENSITIVITY='0'
             SYSCOOLING='1'; ALLOWTHROTTLE='2'; IDLEDISABLE='0'
             MAXFREQ='0'; PERFRESOURCEPRIORITY='100'
+            # 空闲阈值取 Windows「节能」默认值（40/20，尽早进入深眠）
+            IDLEPROMOTE='40'; IDLEDEMOTE='20'; IDLEMAX='0'
+            HETEROSCHED='5'; HETEROSCHED2='2'
         }
         DC = @{
             PERFBOOSTMODE='0'; PERFBOOSTPOL='0'; PERFEPP='100'; PERFEPP1='100'
@@ -285,6 +310,8 @@ $Script:Profiles = @{
             PERFINCPOL='0'; PERFDECPOL='1'
             PERFLATENCYSENSITIVITY='0'
             SYSCOOLING='1'; ALLOWTHROTTLE='2'; IDLEDISABLE='1'; MAXFREQ='0'
+            IDLEPROMOTE='40'; IDLEDEMOTE='20'; IDLEMAX='0'
+            HETEROSCHED='5'; HETEROSCHED2='5'
         }
     }
 }
@@ -636,7 +663,7 @@ function Get-ProfileDiff {
     }
 }
 
-function Apply-Profile {
+function Set-PowerProfile {
     <#  备份 → 克隆 → 取消隐藏 → 逐项写入(原生API) → 激活 → 回读校验 #>
     param(
         [Parameter(Mandatory)][ValidateSet('balanced-stable','max-perf','eco')][string]$ProfileKey,

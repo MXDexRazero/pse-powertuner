@@ -1,12 +1,12 @@
 # PSE-PowerTuner
 
-基于 **PowerSettingsExplorer** 逆向出的隐藏电源设置 GUID 表，把处理器性能相关的 26 项
+基于 **PowerSettingsExplorer** 逆向出的隐藏电源设置 GUID 表，把处理器性能相关的 31 项
 设置自动调成三档场景。核心不是"调用 powercfg"，而是**直接调用 `powrprof.dll`**——
 这是 PowerSettingsExplorer 的做法，也是本机能生效的唯一路径。
 
 | 档位 | Key | 基底方案 | 适用 |
 |---|---|---|---|
-| 稳定本 | `balanced-stable` | 平衡 | 日常办公、开发机、虚拟机 |
+| 稳定版 | `balanced-stable` | 平衡 | 日常办公、开发机、虚拟机 |
 | 极致版 | `max-perf` | 高性能 | 游戏、渲染、低延迟 |
 | 节能版 | `eco` | 节能 | 续航、移动办公 |
 
@@ -46,7 +46,7 @@ cd <本仓库目录>
 
 ## 三档差异（AC 交流档）
 
-| 设置 | 稳定本 | 极致版 | 节能版 |
+| 设置 | 稳定版 | 极致版 | 节能版 |
 |---|---|---|---|
 | `PERFBOOSTMODE` 性能提升模式 | 2 激进 | 2 激进 | 1 启用 |
 | `PERFEPP` 能效偏好 | 50 | **0 纯性能** | 80 |
@@ -58,19 +58,26 @@ cd <本仓库目录>
 | `PERFLATENCYSENSITIVITY` 延迟敏感度 | 50 | **100** | 0 |
 | `PERFHETERO` 异构调度 | 4 优先P核 | 4 优先P核 | 0 自动 |
 | `IDLEDISABLE` 空闲禁用（DC） | 0 | — | 1 |
+| `IDLEPROMOTE` 空闲深眠阈值 | 60 | **60（电池档也不降）** | 40 |
+| `IDLEDEMOTE` 空闲唤醒阈值 | 40 | **40（电池档也不降）** | 20 |
+| `IDLEMAX` 最深 C 态上限 | 0 不限制 | 0 不限制 | 0 不限制 |
+| `HETEROSCHED` / `HETEROSCHED2` 异构线程调度 | 5 / 2 | 5 / 2 | 5 / 2 |
 
+空闲三项取值照抄 Windows 对应默认方案（高性能 60/40、平衡 60/40、节能 40/20）；
+异构调度两项在 Windows 全部方案中取值恒定，本项目不分档改写。
 电池档（DC）是独立的一套更保守参数，需加 `-IncludeDC` 才写入。
 
 ## 本机实测验证结果
 
 34 项候选设置经「读 → 写 → 回读 → 还原」往返验证：
 
-- **26 项可读可写** → 全部编入三档配置
+- **31 项可读可写** → **全部**已编入三档配置
 - **3 项只读**（`PERFINCTIME` / `PERFDECTIME` / `PERFTIME`，写入被拒）
-- **1 项不可读**（`93b8b6dc-…` 异构线程调度，rc=2）
-- 极致版演练：**47 项写入全部通过，0 失败**；节能版：**41 项，0 失败**
+- **0 项不可读**（此前记录的「异构调度不可读」是探测脚本 GUID 抄写错误所致，已修正）
+- 极致版演练（`-DryRun -IncludeDC`）：**57 项写入全部通过，0 失败**；节能版：**51 项，0 失败**
 
-原始数据：`_ref\writable-test.csv`、`_ref\processor-settings.csv`（95 项完整清单）。
+95 项完整清单见 `_ref\processor-settings.csv`；上述可写性结论可用
+`_ref\Test-PwrApi.ps1`（管理员）随时复现，其产物 `writable-test.csv` 为机器专属，已加入 `.gitignore`。
 
 ## 文件
 
@@ -82,8 +89,7 @@ cd <本仓库目录>
 | `Invoke-PowerBench.ps1` | 基准对照（吞吐 / 频率 / 抖动），纯 .NET，无第三方依赖 |
 | `Show-PowerReport.ps1` | HTML 报告：三档差异 + 基准趋势 |
 | `Install-PowerTuneTask.ps1` | 计划任务：登录应用 / 插拔电源自适应 |
-| `_ref\Test-PwrApi.ps1` | 可写性探测工具，换机器时重跑它刷新白名单 |
-| `_ref\writable-test.csv` | 26 项可写 / 3 项只读 / 1 项不可读 的实测记录 |
+| `_ref\Test-PwrApi.ps1` | 可写性探测工具，换机器时重跑它刷新白名单（产物 csv 不入库） |
 | `_ref\processor-settings.csv` | 处理器电源管理子组下全部 95 项设置清单 |
 | `_ref\Push-ViaApi.ps1` | 备用上传通路（`github.com:443` 被屏蔽时走 REST 对象 API） |
 | `vendor\PowerSettingsExplorer.zip` | 第三方工具归档，仅供溯源；说明见 `vendor\NOTICE.md` |
@@ -94,7 +100,7 @@ cd <本仓库目录>
 脚本已内建存在性校验：读不到就记为 `Fail` 并跳过，不会写坏方案。要在新机器上刷新白名单：
 
 ```powershell
-.\_ref\Test-PwrApi.ps1        # 产出 _ref\writable-test.csv，据此更新模块内的 $Script:Writable
+.\_ref\Test-PwrApi.ps1        # 重探测本机可写集合，据此更新模块内的 $Script:Writable
 ```
 
 ## 安全设计
@@ -108,13 +114,13 @@ cd <本仓库目录>
 ## 已知限制与风险
 
 **极致版把最小处理器状态设为 100% 并禁止核心停放。** 在散热受限的轻薄本上，这会持续高频、
-触发温度墙降频，实际表现可能**低于**稳定本。笔记本建议先跑：
+触发温度墙降频，实际表现可能**低于**稳定版。笔记本建议先跑：
 
 ```powershell
 .\Apply-PowerProfile.ps1 -Profile max-perf -IncludeDC
 .\Invoke-PowerBench.ps1 -Label "极致版"
 .\Apply-PowerProfile.ps1 -Profile balanced-stable -IncludeDC
-.\Invoke-PowerBench.ps1 -Label "稳定本"
+.\Invoke-PowerBench.ps1 -Label "稳定版"
 .\Show-PowerReport.ps1 -Open     # 看两档的多核吞吐与抖动对比
 ```
 
@@ -149,6 +155,7 @@ PowerReadDefaultACIndex   PowerReadDefaultDCIndex  PowerDeterminePlatformRole
 - `POWER_DATA_ACCESSOR`（29 个成员，含 `ACCESS_AC_POWER_SETTING_INDEX`、`ACCESS_ATTRIBUTES`、`ACCESS_ACTIVE_OVERLAY_SCHEME` 等）
 - `SchemeTypes{ scheme, overlay, profile }`、`RegType`（含 `REG_QWORD`）
 - 支持 `ExportSettings` / `ImportSettings` / `SaveSettingsAsSctipt` / `WriteToBatchFile`
+  （`SaveSettingsAsSctipt` 为原始程序集内的既有拼写，此处照录未改）
 
 本项目只借鉴其 API 调用方式与 GUID 语义，代码为自行实现。原始归档放在
 `vendor\PowerSettingsExplorer.zip` 供溯源（含 SHA256 与来源说明，见 `vendor\NOTICE.md`）；

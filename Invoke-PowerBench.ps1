@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     三档配置对照基准：CPU 单/多核吞吐 + 频率驻留 + 调度抖动
 .DESCRIPTION
@@ -80,47 +80,80 @@ catch {
 
 #region ── 负载与抖动测量 ───────────────────────────────────────────────
 
+$loadScript = @'
+param([int]$MyMilliseconds, [int]$MyIndex)
+
+$acc = 0.0
+$ops = [long]0
+$buf = New-Object 'double[]' 512
+for ($i = 0; $i -lt 512; $i++) { $buf[$i] = $i * 0.5 }
+
+$sw = [System.Diagnostics.Stopwatch]::StartNew()
+while ($sw.ElapsedMilliseconds -lt $MyMilliseconds) {
+    for ($i = 1; $i -le 10000; $i++) {
+        $acc += [Math]::Sqrt($i) * 1.000001
+        $buf[$i % 512] = $acc * 0.999999
+        if ($acc -gt 1e12) { $acc = 0.0 }
+    }
+    $ops += 10000
+}
+$sw.Stop()
+
+[pscustomobject]@{ Index = $MyIndex; Ops = $ops; ElapsedMs = $sw.ElapsedMilliseconds }
+'@
+
 function Invoke-CpuLoad {
-    <#  多线程混合负载：整数/浮点/内存访问，返回总操作数与耗时  #>
+    <#
+        多线程混合负载：浮点 + 内存访问，返回总操作数与耗时。
+        实现说明：Windows PowerShell 5.1 中把 ScriptBlock 挂到原生
+        [Threading.Thread] 上执行会直接终止进程（该线程没有 Runspace），
+        因此这里改用 RunspacePool —— 5.1 下唯一受支持的并行方式。
+    #>
     param(
         [Parameter(Mandatory)][int]$Threads,
         [Parameter(Mandatory)][int]$Milliseconds
     )
 
-    $bucket = [hashtable]::Synchronized(@{})
-    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $pool = $null
+    $jobs = New-Object 'System.Collections.Generic.List[object]'
+    try {
+        $pool = [runspacefactory]::CreateRunspacePool($Threads, $Threads)
+        $pool.ThreadOptions = 'ReuseThread'
+        $pool.Open()
 
-    $threads = 1..$Threads | ForEach-Object {
-        $idx = $_
-        $t = [Threading.Thread]::new([Threading.ThreadStart]{
-            $acc = 0.0
-            $ops = 0L
-            $localSw = [Diagnostics.Stopwatch]::StartNew()
-            $buf = New-Object 'double[]' 512
-            for ($i = 0; $i -lt 512; $i++) { $buf[$i] = $i * 0.5 }
-            while ($localSw.ElapsedMilliseconds -lt $Milliseconds) {
-                for ($i = 1; $i -le 10000; $i++) {
-                    $acc += [Math]::Sqrt($i) * 1.000001
-                    $buf[$i % 512] = $acc * 0.999999
-                    if ($acc -gt 1e12) { $acc = 0.0 }
-                }
-                $ops += 10000
-            }
-            $bucket[$idx] = $ops
-        })
-        $t.IsBackground = $true
-        $t.Start()
-        $t
+        $sw = [Diagnostics.Stopwatch]::StartNew()
+        for ($i = 0; $i -lt $Threads; $i++) {
+            $ps = [powershell]::Create()
+            $ps.RunspacePool = $pool
+            $null = $ps.AddScript($loadScript).AddArgument($Milliseconds).AddArgument($i)
+            $jobs.Add([pscustomobject]@{
+                PS     = $ps
+                Handle = $ps.BeginInvoke()
+            })
+        }
+
+        $total = [long]0
+        $done  = 0
+        foreach ($j in $jobs) {
+            $out = $j.PS.EndInvoke($j.Handle)
+            foreach ($r in $out) { $total += [long]$r.Ops; $done++ }
+        }
+        $sw.Stop()
     }
-    foreach ($t in $threads) { $t.Join() }
+    finally {
+        foreach ($j in $jobs) { if ($j.PS) { $j.PS.Dispose() } }
+        if ($pool) { $pool.Close(); $pool.Dispose() }
+    }
 
-    $total = 0L
-    foreach ($v in $bucket.Values) { $total += [long]$v }
+    if ($done -lt $Threads) {
+        Write-TuneLog "负载线程仅 $done/$Threads 个返回结果，吞吐数据可能偏低" 'WARN'
+    }
 
     [pscustomobject]@{
-        Threads   = $Threads
-        ElapsedMs = $sw.ElapsedMilliseconds
-        Ops       = $total
+        Threads    = $Threads
+        ElapsedMs  = $sw.ElapsedMilliseconds
+        Workers    = $done
+        Ops        = $total
         MopsPerSec = if ($sw.ElapsedMilliseconds -gt 0) {
             [math]::Round($total / ($sw.ElapsedMilliseconds / 1000.0) / 1e6, 2)
         } else { 0 }
@@ -155,7 +188,8 @@ function Measure-SchedulerJitter {
 function Measure-AverageFrequency {
     param([int]$Samples = 20, [int]$IntervalMs = 100)
     if (-not $hasFreq) { return 0 }
-    $all = New-Object 'System.Collections.Generic.List[uint]'
+    # 类型名必须写全（uint 是 C# 别名，PowerShell 只认 System.UInt32）
+    $all = New-Object 'System.Collections.Generic.List[System.UInt32]'
     for ($i = 0; $i -lt $Samples; $i++) {
         $r = [PseCpuFreq]::Current()
         foreach ($v in $r) { if ($v -gt 0) { $all.Add($v) } }
@@ -175,9 +209,11 @@ $logical    = [Environment]::ProcessorCount
 
 Write-Host "`n═══ 基准测试：$Label ═══" -ForegroundColor Cyan
 Write-Host "当前方案: $schemeName ($scheme)" -ForegroundColor DarkGray
-Write-Host "逻辑处理器: $logical · 每项负载 ${Seconds}s`n" -ForegroundColor DarkGray
+Write-Host "逻辑处理器: $logical · 每项负载 ${Seconds}s" -ForegroundColor DarkGray
 
-Write-Host '[1/4] 单线程吞吐 ...' -ForegroundColor Yellow
+# PS 5.1 的 Write-Host 会 trim 掉结尾的 `n，且 Write-Host '' 完全不输出；
+# 空行只能靠下一条 Write-Host 的前导 `n 来产生。
+Write-Host "`n[1/4] 单线程吞吐 ..." -ForegroundColor Yellow
 $single = Invoke-CpuLoad -Threads 1 -Milliseconds ($Seconds * 1000)
 
 Write-Host "[2/4] 全核吞吐（$logical 线程）..." -ForegroundColor Yellow
@@ -204,14 +240,18 @@ $result = [pscustomobject]@{
 }
 
 Write-Host "`n═══ 结果 ═══" -ForegroundColor Cyan
-$result | Format-List
+# 就地渲染：若让 Format-List 的对象流到管道，被上级脚本 & 调用时会被当成
+# 返回值，污染调用方的退出码判断（Out-Host 不影响 $result 本身）。
+$result | Format-List | Out-Host
 
 $csv = Join-Path $work 'reports\bench.csv'
 $result | Export-Csv -Path $csv -Append -NoTypeInformation -Encoding UTF8
 Write-Host "已追加记录到 $csv" -ForegroundColor DarkGray
 
 # 与历史同方案对比
-$hist = @(Import-Csv $csv -ErrorAction SilentlyContinue | Where-Object { $_.SchemeGuid -eq $scheme })
+# 同样避免单行结果被拆包后 .Count 失效的坑
+$hist = @()
+$hist += @(Import-Csv $csv -ErrorAction SilentlyContinue | Where-Object { $_.SchemeGuid -eq $scheme })
 if ($hist.Count -gt 1) {
     $prev = $hist[-2]
     Write-Host '与上次同方案对比：' -ForegroundColor Yellow
@@ -222,6 +262,10 @@ if ($hist.Count -gt 1) {
     }
 }
 
-Write-Host "`n生成图表报告: .\Show-PowerReport.ps1 -Open`n" -ForegroundColor DarkGray
+# ⚠️ 本脚本【只做基准并把结果追加到 reports\bench.csv】，不会生成 HTML 报告。
+# 此前这里写成「生成图表报告: .\Show-PowerReport.ps1 -Open」，措辞像"已经生成"，
+# 与菜单随后的「执行完成（退出码 0）」连读会被误认为报告已产出（实测踩过）。
+# 故改为明确的「下一步（未自动执行）」措辞。
+Write-Host "`n下一步（本脚本未自动执行）: .\Show-PowerReport.ps1 -Open    # 生成 HTML 报告并打开" -ForegroundColor DarkGray
 
 #endregion

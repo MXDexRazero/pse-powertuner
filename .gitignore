@@ -1,6 +1,9 @@
 # 第三方工具二进制（不随本项目分发，见 README「第三方组件」）
 _ref/PowerSettingsExplorer.exe
 
+# 探测脚本产物：机器专属，且「原值」列依赖运行时的激活方案，不入库
+_ref/writable-test.csv
+
 # 运行时产物
 *.log
 *.tmp

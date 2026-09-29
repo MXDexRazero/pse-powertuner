@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-    PowerSettingsExplorer 性能自动调整 —— 一键入口（稳定本 / 极致版 / 节能版）
+    PowerSettingsExplorer 性能自动调整 —— 一键入口（稳定版 / 极致版 / 节能版）
 .DESCRIPTION
     通过 powrprof.dll 原生 API 读写电源设置（不是 powercfg，原因见模块头部说明）。
     自动探测硬件特征选档，也可 -Profile 显式指定。
@@ -58,8 +58,9 @@ function Show-Detect {
         Write-Host "  不可用       : $($unsupported -join ', ')" -ForegroundColor DarkGray
     }
 
-    Write-Host "`n推荐配置档: " -NoNewline
-    Write-Host $Recommended -ForegroundColor Green
+    # 不能用 Write-Host "`n推荐配置档: " -NoNewline：-NoNewline 会 trim 掉前导换行；
+    # 也不能用 Write-Host ''：PS 5.1 下空串完全不输出。故整行一次写出。
+    Write-Host ("`n推荐配置档: {0}" -f $Recommended) -ForegroundColor Green
     $why = switch ($Recommended) {
         'max-perf'        { '核心数充足或存在大小核 → 禁止核心停放、锁定高频、激进升频、EPP 归零' }
         'eco'             { '笔记本且核心数较少 → 限制最大处理器状态、EPP 拉满、积极降频' }
@@ -192,7 +193,7 @@ if ($Restore) {
     exit 0
 }
 
-$result = Apply-Profile -ProfileKey $resolved `
+$result = Set-PowerProfile -ProfileKey $resolved `
                         -IncludeDC:$IncludeDC `
                         -NoActivate:$NoActivate `
                         -SkipBackup:$SkipBackup

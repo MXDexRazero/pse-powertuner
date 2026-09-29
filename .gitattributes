@@ -6,5 +6,10 @@
 *.md    text eol=lf
 *.csv   text eol=lf
 
+# 批处理必须保持 CRLF：cmd 按 OEM 代码页（936）解码，若同时是 LF 换行，
+# 会把多字节内容整段误判为命令，表现为满屏「'***' 不是内部或外部命令」。
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
 *.exe   binary
 *.png   binary

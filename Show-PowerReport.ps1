@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     生成电源配置报告：当前值 vs 三档目标值 + 基准测试历史 + 备份记录（HTML）
 .EXAMPLE
@@ -16,7 +16,11 @@ $work = Get-WorkRoot
 $scheme  = Get-ActiveScheme
 $schemes = Get-SchemeList
 $csv     = Join-Path $work 'reports\bench.csv'
-$bench   = if (Test-Path $csv) { @(Import-Csv $csv) } else { @() }
+# 注意：不能用 $bench = @(Import-Csv $csv)。单行结果会被赋值拆包成单个
+# PSCustomObject，而 PS 5.1 下 PSCustomObject.Count 返回 $null，
+# 导致 "$bench.Count -gt 0" 恒为假。先声明为数组再 += 才安全。
+$bench = @()
+if (Test-Path $csv) { $bench += @(Import-Csv $csv) }
 
 $known   = Get-KnownSettings
 $pStable = Get-ProfileDefinition 'balanced-stable'
@@ -28,7 +32,7 @@ foreach ($p in @($pStable, $pMax, $pEco)) { $allNames += $p.AC.Keys }
 $allNames = $allNames | Sort-Object -Unique
 
 $rows = foreach ($a in $allNames) {
-    $cur = Get-PowerSettingValue -Name $a
+    $cur = Get-Value -Name $a
     [pscustomobject]@{
         Name    = $a
         Desc    = $known[$a].Desc
@@ -96,7 +100,7 @@ foreach ($kv in $hwRows) {
 
 # ── 三档对照 ──
 [void]$sb.Append('<h2>三档目标值对照（AC 交流档）</h2>')
-[void]$sb.Append('<table><tr><th>设置项</th><th>说明</th><th>当前值</th><th>稳定本</th><th>极致版</th><th>节能版</th></tr>')
+[void]$sb.Append('<table><tr><th>设置项</th><th>说明</th><th>当前值</th><th>稳定版</th><th>极致版</th><th>节能版</th></tr>')
 foreach ($r in $rows) {
     $cls = 'none'
     $curTxt = if ($null -ne $r.Current) { $r.Current } else { '—' }
@@ -116,7 +120,7 @@ foreach ($r in $rows) {
 [void]$sb.Append(@'
 <div class="legend">
 <span class="dot" style="background:#5fd38d"></span>当前值 = 极致版
-<span class="dot" style="background:#ffcc66;margin-left:14px"></span>当前值 = 稳定本
+<span class="dot" style="background:#ffcc66;margin-left:14px"></span>当前值 = 稳定版
 <span class="dot" style="background:#7cc4ff;margin-left:14px"></span>当前值 = 节能版
 <span class="dot" style="background:#4d5563;margin-left:14px"></span>本机不支持或不匹配
 </div>
@@ -149,8 +153,9 @@ if ($bench.Count -gt 0) {
 #endregion
 
 # ── 备份记录 ──
-$bks = @(Get-ChildItem (Join-Path $work 'backup') -Directory -ErrorAction SilentlyContinue |
-         Sort-Object LastWriteTime -Descending)
+$bks = @()
+$bks += @(Get-ChildItem (Join-Path $work 'backup') -Directory -ErrorAction SilentlyContinue |
+          Sort-Object LastWriteTime -Descending)
 if ($bks.Count -gt 0) {
     [void]$sb.Append('<h2>备份记录（最近 12 条）</h2><table><tr><th>时间</th><th>目录</th></tr>')
     foreach ($b in ($bks | Select-Object -First 12)) {
@@ -163,7 +168,7 @@ if ($bks.Count -gt 0) {
 [void]$sb.Append(@'
 <div class="warn">
 极致版会把最小处理器状态设为 100% 并禁止核心停放。在散热受限的轻薄本上这反而可能触发降频，
-表现低于稳定本。回滚命令：<code>.\Rollback-PowerScheme.ps1</code>
+表现低于稳定版。回滚命令：<code>.\Rollback-PowerScheme.ps1</code>
 或 <code>.\Apply-PowerProfile.ps1 -Restore</code>
 </div>
 '@)

@@ -1,4 +1,4 @@
-# 探测验证：确认 powrprof 原生 API 的写入能力边界
+﻿# 探测验证：确认 powrprof 原生 API 的写入能力边界
 # 目的：为三档脚本确定「本机真实可写」的设置集合
 $ErrorActionPreference = 'Stop'
 
@@ -88,8 +88,11 @@ $table = [ordered]@{
   IDLEDEMOTE           = '4b92d758-5a24-4851-a470-815d78aee119'
   IDLEMAX              = '9943e905-9a30-4ec1-9b99-44dd3b76f7a2'
   PERFRESOURCEPRIORITY = '603fe9ce-8d01-4b48-a968-1d706c28fd5c'
-  HETEROSCHED          = '93b8b6dc-0688-4d1c-9ee4-0644e900c85d'
-  HETEROSCHED2         = '93b8b6dc-0668-4d1c-9ee4-0644e900c85d'
+  # 两条异构调度策略：GUID 以 _ref\processor-settings.csv（95 项完整清单）为准。
+  # 早前此处误写成 93b8b6dc-0688 / -0668（该清单中不存在），导致两项探测必然返回 ERR2，
+  # 从而被误判成「本机不可读」。第二条属于另一个 GUID 家族，修正如下。
+  HETEROSCHED          = '93b8b6dc-0698-4d1c-9ee4-0644e900c85d'   # Heterogeneous thread scheduling policy
+  HETEROSCHED2         = 'bae08b81-2d5e-4688-ad6a-13243356654b'   # Heterogeneous short running thread scheduling policy
 }
 
 Write-Host "=== 逐项测试（读 → 写 → 回读）===" -ForegroundColor Cyan
@@ -121,4 +124,6 @@ $results = foreach($k in $table.Keys){
 $results | Format-Table -AutoSize
 $results | Export-Csv (Join-Path $PSScriptRoot 'writable-test.csv') -NoTypeInformation -Encoding UTF8
 Write-Host "可读+可写: $(@($results | Where-Object { $_.可读 -and $_.可写 }).Count) / $($results.Count)" -ForegroundColor Green
-Write-Host "已导出 _ref\writable-test.csv"
+# 输出为机器专属数据，且「原值」列取的是【运行时当前激活方案】上的值
+# （换一个激活方案再跑，同一设置就会显示不同的原值），故不入库，见 .gitignore。
+Write-Host "已导出 _ref\writable-test.csv（本地产物，已 gitignore）"
