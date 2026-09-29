@@ -25,14 +25,14 @@
 | `Apply-PowerProfile.ps1` | 修改 | 9793 B | 9976 B | +5 / -4 | 见下文详解 |
 | `Install-PowerTuneTask.ps1` | 修改 | 4651 B | 4654 B | +0 / -0 | 见下文详解 |
 | `Invoke-PowerBench.ps1` | 修改 | 8248 B | 10215 B | +84 / -40 | 见下文详解 |
-| `README.md` | 修改 | 7983 B | 14119 B | +137 / -30 | 见下文详解 |
+| `README.md` | 修改 | 7983 B | 14414 B | +147 / -30 | 见下文详解 |
 | `Rollback-PowerScheme.ps1` | 修改 | 2828 B | 2990 B | +6 / -2 | 见下文详解 |
 | `Show-PowerReport.ps1` | 修改 | 8239 B | 8484 B | +12 / -7 | 见下文详解 |
 | `_ref/Test-PwrApi.ps1` | 修改 | 6435 B | 7105 B | +8 / -3 | 见下文详解 |
 | `modules/PowerTune.psm1` | 修改 | 31032 B | 33141 B | +41 / -13 | 见下文详解 |
 | `vendor/NOTICE.md` | 修改 | 1991 B | 2583 B | +38 / -27 | 见下文详解 |
 | `.github/workflows/release.yml` | **新增** | — | 4570 B | 全新文件 | 见下文详解 |
-| `DIFF-vs-upstream.md` | **新增** | — | 23337 B | 全新文件 | 见下文详解 |
+| `DIFF-vs-upstream.md` | **新增** | — | 24114 B | 全新文件 | 见下文详解 |
 | `Show-PowerMenu.ps1` | **新增** | — | 44246 B | 全新文件 | 见下文详解 |
 | `运行控制面板.bat` | **新增** | — | 2815 B | 全新文件 | 见下文详解 |
 | `_ref/Push-ViaApi.ps1` | **删除** | 3635 B | — | 已移除 | 见下文详解 |
@@ -113,7 +113,7 @@ _ref/writable-test.csv
 
 ### `README.md`
 
-**规模**：上游 7983 字节 → 本地 14119 字节，行变化 +137 / -30。
+**规模**：上游 7983 字节 → 本地 14414 字节，行变化 +147 / -30。
 
 随核心模块同步更新对外表述，主要有：
 
@@ -240,7 +240,7 @@ _ref/writable-test.csv
 
 ### `DIFF-vs-upstream.md`
 
-**规模**：新增文件，23337 字节。
+**规模**：新增文件，24114 字节。
 
 **全新文件（本文档）。**
 
