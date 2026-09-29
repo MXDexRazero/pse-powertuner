@@ -16,8 +16,8 @@ rem      3) All commands    (script -> parameter -> value, then execute)
 rem      0 / Esc) Exit
 rem
 rem  Usage:
-rem      Run-PowerTune.bat              mouse + keyboard
-rem      Run-PowerTune.bat -nomouse     keyboard only (if mouse misbehaves)
+rem      this .bat                  mouse + keyboard
+rem      this .bat -nomouse         keyboard only (if mouse misbehaves)
 rem
 rem  If the current session is not elevated, it re-launches itself with
 rem  Start-Process -Verb RunAs (UAC prompt), then exits.
@@ -56,8 +56,12 @@ exit /b 0
 
 :ELEVATE
 echo Requesting administrator privileges (UAC) ...
+rem Carry -nomouse across the elevation, otherwise the escape hatch is lost
+rem (the re-launched elevated copy would start with mouse mode enabled).
+set "ELEV_ARG="
+if /i "%~1"=="-nomouse" set "ELEV_ARG=-ArgumentList '-nomouse'"
 "%PS_EXE%" -NoProfile -ExecutionPolicy Bypass -Command ^
-  "try{Start-Process -FilePath '%~f0' -Verb RunAs -ErrorAction Stop;exit 0}catch{exit 1}"
+  "try{Start-Process -FilePath '%~f0' %ELEV_ARG% -Verb RunAs -ErrorAction Stop;exit 0}catch{exit 1}"
 if errorlevel 1 (
   echo.
   echo [ERROR] Elevation failed or was cancelled.

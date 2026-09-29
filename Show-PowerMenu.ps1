@@ -2,8 +2,8 @@
 .SYNOPSIS
     PSE-PowerTuner 交互式控制面板（中文菜单，鼠标点击 + 键盘序号双通道）
 .DESCRIPTION
-    由根目录 Run-PowerTune.bat 以管理员身份启动；也可直接
-    .\Show-PowerMenu.ps1 运行（非管理员时部分功能会失败）。
+    由根目录「运行控制面板.bat」以管理员身份启动（双击即可，自动 UAC 提权）；
+    也可直接 .\Show-PowerMenu.ps1 运行（非管理员时部分功能会失败）。
 
     主菜单：
       1  一键测试   Apply-PowerProfile.ps1 -Profile auto -IncludeDC
@@ -372,7 +372,7 @@ function Show-Header {
     if ($isAdmin) {
         Write-Host "   管理员  : 是" -ForegroundColor Green
     } else {
-        Write-Host "   管理员  : 否 —— 应用/回滚会失败，请以管理员身份运行 Run-PowerTune.bat" -ForegroundColor Red
+        Write-Host "   管理员  : 否 —— 应用/回滚会失败，请以管理员身份运行「运行控制面板.bat」" -ForegroundColor Red
     }
     if ($script:MouseEnabled) {
         Write-Host "   操作    : 鼠标直接点选项，或输入序号后回车（Esc/Ctrl+C = 返回上级）" -ForegroundColor DarkGray
@@ -558,7 +558,7 @@ function Show-CommandList {
     Show-Arg '-Remove'        '卸载全部已注册任务'
 
     Show-Section '启动器'
-    Show-Script '.\Run-PowerTune.bat'   '双击入口：非管理员自动 UAC 提权并打开本菜单（内容纯 ASCII）'
+    Show-Script '.\运行控制面板.bat'    '双击入口：非管理员自动 UAC 提权并打开本菜单（内容纯 ASCII）'
     Show-Script '.\Show-PowerMenu.ps1'  '本交互菜单本体（也可直接运行，需管理员）'
 
     Show-Section '常用组合'
